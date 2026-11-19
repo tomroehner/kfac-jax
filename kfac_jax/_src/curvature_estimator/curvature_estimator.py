@@ -181,6 +181,8 @@ class CurvatureEstimator(Generic[StateType], utils.Finalizable):
       use_cached: bool,
       pmap_axis_name: str | None,
       norm_to_scale_identity_weight_per_block: str | None = None,
+      prior_state: StateType | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> utils.Params:
     """Computes ``(CurvatureMatrix + identity_weight I)**power`` times ``vector``.
 
@@ -325,6 +327,8 @@ class CurvatureEstimator(Generic[StateType], utils.Finalizable):
       approx_powers: curvature_blocks.ScalarOrSequence | None,
       eigenvalues: bool,
       pmap_axis_name: str | None,
+      prior_state: StateType | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> StateType:
     """Updates the estimator cached values.
 

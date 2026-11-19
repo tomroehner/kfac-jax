@@ -231,6 +231,8 @@ class KroneckerFactored(CurvatureBlock, abc.ABC):
       power: Scalar,
       exact_power: bool,
       use_cached: bool,
+      prior_state: State | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> tuple[Array, ...]:
 
     assert len(state.factors) == self.array_ndim
@@ -276,8 +278,16 @@ class KroneckerFactored(CurvatureBlock, abc.ABC):
         ]
 
       else:
+        factors = [factor.value for factor in state.factors]
+        if prior_state is not None and prior_state.factors is not None:
+          prior_factors = [factor.value for factor in prior_state.factors]
+          factor_lambda = jnp.sqrt(prior_weight)
+          factors = [
+              f_curr + factor_lambda * f_prior
+              for f_curr, f_prior in zip(factors, prior_factors)
+          ]
         s, q = zip(
-            *[utils.safe_psd_eigh(factor.value) for factor in state.factors]
+            *[utils.safe_psd_eigh(f) for f in factors]
         )
 
       eigenvalues = utils.outer_product(*s) + identity_weight
@@ -300,6 +310,14 @@ class KroneckerFactored(CurvatureBlock, abc.ABC):
 
       else:
         factors = [factor.value for factor in state.factors]
+
+        if prior_state is not None and prior_state.factors is not None:
+          prior_factors = [factor.value for factor in prior_state.factors]
+          factor_lambda = jnp.sqrt(prior_weight)
+          factors = [
+              f_curr + factor_lambda * f_prior
+              for f_curr, f_prior in zip(factors, prior_factors)
+          ]
 
         factors = utils.pi_adjusted_kronecker_factors(
             *factors, damping=identity_weight)
@@ -354,6 +372,8 @@ class KroneckerFactored(CurvatureBlock, abc.ABC):
       exact_powers: set[Scalar],
       approx_powers: set[Scalar],
       eigenvalues: bool,
+      prior_state: State | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> State:
 
     assert len(state.factors) == self.array_ndim
@@ -364,9 +384,20 @@ class KroneckerFactored(CurvatureBlock, abc.ABC):
     scale = self.state_dependent_scale(state)
     factor_scale = jnp.power(scale, 1.0 / self.array_ndim)
 
+    # Extract current task factors
+    factors = [factor.value for factor in state.factors]
+
+    # Inject S_{t-1} if provided
+    if prior_state is not None and prior_state.factors is not None:
+      prior_factors = [factor.value for factor in prior_state.factors]
+      factor_lambda = jnp.sqrt(prior_weight)
+      factors = [
+        f_curr + factor_lambda * f_prior for f_curr, f_prior in zip(factors, prior_factors)
+      ]
+
     if eigenvalues or exact_powers:
 
-      s_q = [utils.safe_psd_eigh(factor.value) for factor in state.factors]
+      s_q = [utils.safe_psd_eigh(f) for f in factors]
 
       s, q = zip(*s_q)
 
@@ -379,7 +410,7 @@ class KroneckerFactored(CurvatureBlock, abc.ABC):
     if approx_powers:
 
       damped_factors = utils.pi_adjusted_kronecker_factors(
-          *[factor.value for factor in state.factors],
+          *factors,
           damping=identity_weight,
       )
 

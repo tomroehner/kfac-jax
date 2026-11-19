@@ -498,14 +498,20 @@ class BlockDiagonalCurvature(
       use_cached: bool,
       pmap_axis_name: str | None,
       norm_to_scale_identity_weight_per_block: str | None = None,
+      prior_state: State | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> utils.Params:
 
     blocks_vectors = self.params_vector_to_blocks_vectors(
         parameter_structured_vector)
 
     identity_weight = utils.to_tuple_or_repeat(identity_weight, self.num_blocks)
+    prior_blocks_states = (
+        prior_state.blocks_states if prior_state is not None
+        else (None,) * self.num_blocks
+    )
 
-    def make_thunk(block, block_state, block_vector, block_identity_weight):
+    def make_thunk(block, block_state, block_prior_state, block_vector, block_identity_weight):
 
       def thunk():
 
@@ -524,16 +530,18 @@ class BlockDiagonalCurvature(
             power=power,
             exact_power=exact_power,
             use_cached=use_cached,
+            prior_state=block_prior_state,
+            prior_weight=prior_weight,
         )
 
       return thunk
 
     thunks = []
-    for block, block_state, block_vector, block_identity_weight in zip(
-        self.blocks, state.blocks_states, blocks_vectors, identity_weight):  # pyrefly: ignore[bad-argument-type]
+    for block, block_state, block_prior_state, block_vector, block_identity_weight in zip(
+        self.blocks, state.blocks_states, prior_blocks_states, blocks_vectors, identity_weight):  # pyrefly: ignore[bad-argument-type]
 
       thunks.append(
-          make_thunk(block, block_state, block_vector, block_identity_weight))
+          make_thunk(block, block_state, block_prior_state, block_vector, block_identity_weight))
 
     if self._distributed_multiplies and pmap_axis_name is not None:
       result = utils.distribute_thunks(thunks, pmap_axis_name)
@@ -932,11 +940,17 @@ class BlockDiagonalCurvature(
       eigenvalues: bool,
       pmap_axis_name: str | None,
       norm_to_scale_identity_weight_per_block: str | None = None,
+      prior_state: State | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> State:
 
     identity_weight = utils.to_tuple_or_repeat(identity_weight, self.num_blocks)
+    prior_blocks_states = (
+        prior_state.blocks_states if prior_state is not None
+        else (None,) * self.num_blocks
+    )
 
-    def make_thunk(block, block_state, block_identity_weight):
+    def make_thunk(block, block_state, block_prior_state, block_identity_weight):
 
       def thunk():
 
@@ -954,16 +968,17 @@ class BlockDiagonalCurvature(
             exact_powers=exact_powers,
             approx_powers=approx_powers,
             eigenvalues=eigenvalues,
+            prior_state=block_prior_state,
+            prior_weight=prior_weight,
         )
 
       return thunk
 
     thunks = []
-    for block, block_state, block_identity_weight in zip(self.blocks,  # pyrefly: ignore[bad-argument-type]
-                                                         state.blocks_states,
-                                                         identity_weight):
+    for block, block_state, block_prior_state, block_identity_weight in zip(
+      self.blocks, state.blocks_states, prior_blocks_states, identity_weight):  # pyrefly: ignore[bad-argument-type]
 
-      thunks.append(make_thunk(block, block_state, block_identity_weight))
+      thunks.append(make_thunk(block, block_state, block_prior_state, block_identity_weight))
 
     if self._distributed_cache_updates and pmap_axis_name is not None:
 

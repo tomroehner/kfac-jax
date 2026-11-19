@@ -885,7 +885,9 @@ class Optimizer(utils.WithStagedMethods):
   def _maybe_update_inverse_cache(
       self,
       state: State,
-      precon_damping: Array
+      precon_damping: Array,
+      prior_state: BlockDiagonalCurvature.State | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> State:
     """Updates the estimator state cache if it is the right iteration."""
 
@@ -901,6 +903,8 @@ class Optimizer(utils.WithStagedMethods):
             approx_powers=self._approx_powers_to_cache,
             eigenvalues=False,
             pmap_axis_name=self.pmap_axis_name,
+            prior_state=prior_state,
+            prior_weight=prior_weight,
         ),
         lambda state_: state_,
         state.estimator_state,
@@ -915,6 +919,8 @@ class Optimizer(utils.WithStagedMethods):
       grads: Params,
       precon_damping: Array,
       can_distribute: bool = True,
+      prior_state: BlockDiagonalCurvature.State | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> Params:
     """Computes the preconditioned gradient."""
 
@@ -927,6 +933,8 @@ class Optimizer(utils.WithStagedMethods):
         use_cached=self._use_cached_inverses,
         pmap_axis_name=self.pmap_axis_name if can_distribute else None,
         norm_to_scale_identity_weight_per_block=self._norm_to_scale_identity_weight_per_block,
+        prior_state=prior_state,
+        prior_weight=prior_weight,
     )
 
   @utils.staged
@@ -1204,6 +1212,8 @@ class Optimizer(utils.WithStagedMethods):
       damping: Array | None,
       should_update_estimate_curvature: bool,
       should_update_damping: bool,
+      prior_state: BlockDiagonalCurvature.State | None = None,
+      prior_weight: Numeric = 1.0,
   )-> ReturnEither:
     """A single full step of the optimizer."""
 
@@ -1242,11 +1252,13 @@ class Optimizer(utils.WithStagedMethods):
     loss, grads = utils.pmean_if_pmap((loss, grads), self.pmap_axis_name)
 
     # Update the inverse curvature
-    state = self._maybe_update_inverse_cache(state, precon_damping)
+    state = self._maybe_update_inverse_cache(
+      state, precon_damping, prior_state=prior_state, prior_weight=prior_weight,
+    )
 
     # Compute proposed directions
     preconditioned_gradient = self._compute_preconditioned_gradient(
-        state, grads, precon_damping
+        state, grads, precon_damping, prior_state=prior_state, prior_weight=prior_weight,
     )
 
     # constrain the norms
@@ -1392,6 +1404,8 @@ class Optimizer(utils.WithStagedMethods):
       learning_rate: Array | None = None,
       momentum: Array | None = None,
       damping: Array | None = None,
+      prior_state: BlockDiagonalCurvature.State | None = None,
+      prior_weight: Numeric = 1.0,
   )-> ReturnEither:
     """Performs a single update step using the optimizer.
 
@@ -1489,7 +1503,8 @@ class Optimizer(utils.WithStagedMethods):
 
     return self._step(
         params, state, rng, batch, func_state, learning_rate, momentum, damping,
-        should_update_estimate_curvature, should_update_damping)
+        should_update_estimate_curvature, should_update_damping,
+        prior_state, prior_weight)
 
   def _calibrate_initial_damping(
       self,

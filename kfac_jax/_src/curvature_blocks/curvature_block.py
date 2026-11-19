@@ -268,6 +268,8 @@ class CurvatureBlock(utils.Finalizable):
       power: Scalar,
       exact_power: bool,
       use_cached: bool,
+      prior_state: State | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> tuple[Array, ...]:
     """Computes ``(BlockMatrix + identity_weight I)**power`` times ``vector``.
 
@@ -308,6 +310,8 @@ class CurvatureBlock(utils.Finalizable):
         power=power,
         exact_power=exact_power,
         use_cached=use_cached,
+        prior_state=prior_state,
+        prior_weight=prior_weight,
     )
 
     return utils.scalar_mul(result, jnp.power(scale, power))
@@ -321,6 +325,8 @@ class CurvatureBlock(utils.Finalizable):
       power: Scalar,
       exact_power: bool,
       use_cached: bool,
+      prior_state: State | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> tuple[Array, ...]:
     """Performs matrix-vector multiplication, ignoring ``self.scale``."""
 
@@ -434,6 +440,8 @@ class CurvatureBlock(utils.Finalizable):
       exact_powers: ScalarOrSequence | None,
       approx_powers: ScalarOrSequence | None,
       eigenvalues: bool,
+      prior_state: State | None = None,
+      prior_weight: Numeric = 1.0
   ) -> State:
     """Updates the cached estimates of the different powers specified.
 
@@ -457,6 +465,8 @@ class CurvatureBlock(utils.Finalizable):
         exact_powers=cb_utils.to_real_set(exact_powers),
         approx_powers=cb_utils.to_real_set(approx_powers),
         eigenvalues=eigenvalues,
+        prior_state=prior_state,
+        prior_weight=prior_weight,
     )
 
   @abc.abstractmethod
@@ -467,6 +477,8 @@ class CurvatureBlock(utils.Finalizable):
       exact_powers: set[Scalar],
       approx_powers: set[Scalar],
       eigenvalues: bool,
+      prior_state: State | None = None,
+      prior_weight: Numeric = 1.0,
   ) -> State:
     """The cache updating function, ignoring ``self.scale``."""
 
